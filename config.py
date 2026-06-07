@@ -6,7 +6,7 @@ ADMIN_IDS = [
     8758830915
 ]
 
-CHANNEL_USERNAME = "@Burmese_Anime"
+CHANNEL_USERNAME = "@CinemaHub_Channel"
 
 CHANNEL_LINK = f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"
 
