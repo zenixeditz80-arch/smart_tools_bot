@@ -1,114 +1,85 @@
 from config import BOT_USERNAME, DATABASE_NAME
 
 from database import (
-user_exists,
-add_referral,
-get_referral_count,
-get_user
+    user_exists,
+    add_referral,
+    get_referral_count,
+    get_user
 )
 
 import sqlite3
 
+
 def get_referral_link(user_id):
-return (
-f"https://t.me/"
-f"{BOT_USERNAME}"
-f"?start={user_id}"
-)
-
-def process_referral(
-user_id,
-referrer_id
-):
-try:
-
-    if user_id == referrer_id:
-        return False
-
-    if not user_exists(referrer_id):
-        return False
-
-    if has_referral(user_id):
-        return False
-
-    add_referral(
-        user_id,
-        referrer_id
+    return (
+        f"https://t.me/"
+        f"{BOT_USERNAME}"
+        f"?start={user_id}"
     )
 
-    return True
 
-except Exception as e:
+def process_referral(user_id, referrer_id):
+    try:
+        if user_id == referrer_id:
+            return False
 
-    print(
-        f"[REFERRAL ERROR] {e}"
-    )
+        if not user_exists(referrer_id):
+            return False
 
-    return False
+        if has_referral(user_id):
+            return False
+
+        add_referral(user_id, referrer_id)
+
+        return True
+
+    except Exception as e:
+        print(f"[REFERRAL ERROR] {e}")
+        return False
+
 
 def has_referral(user_id):
+    try:
+        with sqlite3.connect(DATABASE_NAME) as conn:
+            cursor = conn.cursor()
 
-try:
+            cursor.execute(
+                """
+                SELECT id
+                FROM referrals
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            )
 
-    with sqlite3.connect(
-        DATABASE_NAME
-    ) as conn:
+            return cursor.fetchone() is not None
 
-        cursor = conn.cursor()
+    except Exception:
+        return False
 
-        cursor.execute(
-            """
-            SELECT id
-            FROM referrals
-            WHERE user_id = ?
-            """,
-            (user_id,)
-        )
-
-        return (
-            cursor.fetchone()
-            is not None
-        )
-
-except Exception:
-
-    return False
 
 def referral_count(user_id):
+    return get_referral_count(user_id)
 
-return get_referral_count(
-    user_id
-)
 
 def get_referral_stats(user_id):
+    total = referral_count(user_id)
 
-total = referral_count(
-    user_id
-)
+    return {
+        "total_referrals": total,
+        "reward_points": total
+    }
 
-return {
-    "total_referrals": total,
-    "reward_points": total
-}
 
 def get_reward_points(user_id):
+    return referral_count(user_id)
 
-return referral_count(
-    user_id
-)
 
 def referral_text(user_id):
+    stats = get_referral_stats(user_id)
+    link = get_referral_link(user_id)
 
-stats = get_referral_stats(
-    user_id
-)
-
-link = get_referral_link(
-    user_id
-)
-
-return f"""
-
+    return f"""
 👥 Referral System
 
 🔗 Your Link:
@@ -122,91 +93,71 @@ Invites: {stats['total_referrals']}
 🎁 Rewards: {stats['reward_points']}
 """
 
-def get_leaderboard(
-limit=10
-):
 
-try:
+def get_leaderboard(limit=10):
+    try:
+        with sqlite3.connect(DATABASE_NAME) as conn:
+            cursor = conn.cursor()
 
-    with sqlite3.connect(
-        DATABASE_NAME
-    ) as conn:
+            cursor.execute(
+                """
+                SELECT
+                    user_id,
+                    referrals
+                FROM users
+                ORDER BY referrals DESC
+                LIMIT ?
+                """,
+                (limit,)
+            )
 
-        cursor = conn.cursor()
+            return cursor.fetchall()
 
-        cursor.execute(
-            """
-            SELECT
-                user_id,
-                referrals
-            FROM users
-            ORDER BY referrals DESC
-            LIMIT ?
-            """,
-            (limit,)
-        )
+    except Exception:
+        return []
 
-        return cursor.fetchall()
-
-except Exception:
-
-    return []
 
 def leaderboard_text():
+    users = get_leaderboard()
 
-users = get_leaderboard()
+    if not users:
+        return "No referral data."
 
-if not users:
-    return "No referral data."
+    text = "🏆 Referral Leaderboard\n\n"
 
-text = "🏆 Referral Leaderboard\n\n"
+    for rank, user in enumerate(users, start=1):
+        text += (
+            f"{rank}. "
+            f"User {user[0]} "
+            f"→ {user[1]} invites\n"
+        )
 
-for rank, user in enumerate(
-    users,
-    start=1
-):
+    return text
 
-    text += (
-        f"{rank}. "
-        f"User {user[0]} "
-        f"→ {user[1]} invites\n"
-    )
 
-return text
+def eligible_for_reward(user_id, required=5):
+    return referral_count(user_id) >= required
 
-def eligible_for_reward(
-user_id,
-required=5
-):
-return (
-referral_count(user_id)
->= required
-)
 
 def get_username(user_id):
+    user = get_user(user_id)
 
-user = get_user(
-    user_id
-)
+    if not user:
+        return "Unknown"
 
-if not user:
-    return "Unknown"
+    return user[1]
 
-return user[1]
 
 def referral_bonus(user_id):
+    referrals = referral_count(user_id)
 
-referrals = referral_count(
-    user_id
-)
+    if referrals >= 100:
+        return "VIP"
 
-if referrals >= 100:
-    return "VIP"
+    if referrals >= 50:
+        return "Premium"
 
-if referrals >= 50:
-    return "Premium"
+    if referrals >= 10:
+        return "Fast Queue"
 
-if referrals >= 10:
-    return "Fast Queue"
-
-return "None"
+    return "None"
