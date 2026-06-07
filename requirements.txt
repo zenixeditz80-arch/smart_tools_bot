@@ -1,6 +1,6 @@
 pyTelegramBotAPI==4.28.0
 
-rembg==2.0.67
+rembg==2.0.71
 Pillow==11.3.0
 
 pdf2image==1.17.0
